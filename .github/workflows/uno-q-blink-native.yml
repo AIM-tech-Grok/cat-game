@@ -1,0 +1,21 @@
+name: uno-q-blink native
+
+on:
+  pull_request:
+    paths:
+      - "uno-q-blink/**"
+      - ".github/workflows/uno-q-blink-native.yml"
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Native blink test
+        working-directory: uno-q-blink/test-native
+        run: pio test -e native
