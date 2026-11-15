@@ -1,0 +1,22 @@
+name: cat photo collector
+
+on:
+  pull_request:
+    paths:
+      - "uno-q-cat-photos/**"
+      - ".github/workflows/uno-q-cat-photos.yml"
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Pillow
+        run: pip install pillow
+      - name: Compile the app
+        run: python -m py_compile uno-q-cat-photos/python/main.py uno-q-cat-photos/python/collector.py
+      - name: Crop, clamp, and manifest tests
+        run: python -m unittest discover -s uno-q-cat-photos/tests -v
