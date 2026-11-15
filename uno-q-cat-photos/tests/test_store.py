@@ -131,6 +131,18 @@ class PhotoStoreTest(unittest.TestCase):
         self.assertIn(unlabelled["files"]["crop"], uncertain_names)
         self.assertIn(unlabelled["id"], {row["id"] for row in uncertain_rows})
 
+    def test_negative_stores_the_lighting_it_was_given(self):
+        self.assertEqual(PhotoStore.lighting(), "day")
+        self.assertEqual(PhotoStore.lighting_from({"lighting": "other"}), "other")
+        self.assertEqual(PhotoStore.lighting_from({"lighting": " Other "}), "other")
+        self.assertIsNone(PhotoStore.lighting_from({"lighting": "moon"}))
+        self.assertIsNone(PhotoStore.lighting_from("daylight"))
+        record = PhotoStore.save_negative(jpeg(32, 24, (1, 1, 1)), lighting="other")
+        self.assertEqual(record["class"], "negative")
+        self.assertEqual(record["lighting"], "other")
+        self.assertEqual(PhotoStore.lighting(), "other")
+        self.assertEqual(self.lines()[-1]["lighting"], "other")
+
     def test_paths_cannot_escape_the_photo_root(self):
         self.assertIsNone(PhotoStore._safe_path(PhotoStore.root, "../secret.jpg"))
         self.assertIsNone(PhotoStore._safe_path(PhotoStore.root, "/etc/passwd"))

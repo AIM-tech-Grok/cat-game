@@ -55,8 +55,19 @@ class PhotoStore:
     @staticmethod
     def set_lighting(tag: str | None) -> str:
         if tag in PhotoStore.LIGHTING:
-            PhotoStore._lighting = tag
+            with PhotoStore._lock:
+                PhotoStore._lighting = tag
         return PhotoStore._lighting
+
+    @staticmethod
+    def lighting_from(message) -> str | None:
+        """Return a lighting tag carried by a Web UI message, or None."""
+        tag = message.get("lighting") if isinstance(message, dict) else message
+        if isinstance(tag, str):
+            tag = tag.strip().lower()
+            if tag in PhotoStore.LIGHTING:
+                return tag
+        return None
 
     @staticmethod
     def remember_frame(frame: bytes | None) -> None:
@@ -150,11 +161,17 @@ class PhotoStore:
             return record
 
     @staticmethod
-    def save_negative(frame: bytes | None) -> dict | None:
-        """Save a manual negative. class is set immediately, so it counts as labelled."""
+    def save_negative(frame: bytes | None, lighting: str | None = None) -> dict | None:
+        """Save a manual negative. class is set immediately, so it counts as labelled.
+
+        `lighting` is the tag from the click. It is written on the manifest line even
+        when the selector was still the default.
+        """
         if not frame:
             return None
         with PhotoStore._lock:
+            if lighting in PhotoStore.LIGHTING:
+                PhotoStore._lighting = lighting
             now = time.monotonic()
             if now - PhotoStore._last_save_at < PhotoStore.INTERVAL_S:
                 return None

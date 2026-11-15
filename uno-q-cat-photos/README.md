@@ -4,7 +4,7 @@ UNO Q App Lab app. A USB camera and the stock YOLOX-nano model watch the room. W
 
 This folder follows the App Lab layout used by `uno-q-blink/`: `app.yaml`, `python/main.py`, and a README. There is no sketch. The live page is adapted from the board's Detect Objects on Camera example (`inspirational/common/video-generic-object-detection`). Saving the preview frame follows `bricks/arduino/video_object_detection/03_get_image`.
 
-`app.yaml` pins `yolox-object-detection` on `arduino:video_object_detection` and also uses `arduino:web_ui`. Python opens the camera with `Camera()` and passes that handle to `VideoObjectDetection(camera=camera, confidence=0.5, camera_preview=True)`. It does not open `/dev/videoN`.
+`app.yaml` pins `yolox-object-detection` on `arduino:video_object_detection` and also uses `arduino:web_ui`. The brick opens the camera itself: `VideoObjectDetection(confidence=0.5, camera_preview=True)`, which uses the default `Camera()`. The app does not open `/dev/videoN` and does not call `Camera.capture()`. On app-cli 0.14.1 that method takes no arguments and holds the camera lock for the 10 FPS wait, so a second read would stall the detector.
 
 No extra Python packages. Pillow and NumPy are already in the App Bricks runtime. Do not install system packages from the unprivileged dev account.
 
@@ -43,7 +43,9 @@ You can also copy the folder to `/home/arduino/ArduinoApps/uno-q-cat-photos` as 
 
 The live picture is the model runner's embed on port 4912, same as Detect Objects on Camera. The page on port 7000 is the capture and label controls. Examples from this board: `http://mimaunoq.tailbee7a5.ts.net:7000/` and `http://MiMaUNOQ.local:7000/`.
 
-Set lighting (day, lamp, low, other) before a capture. That value is stored with the photo, and a later Grey / Black / Not a cat click stores the selector's value again with the class. Skip leaves the files in `uncertain/` and does not set a class. Capture negative saves the current frame straight into `negative/` with class `negative`.
+Set lighting (day, lamp, low, other) before a capture. That value is stored with the photo, and a later Grey / Black / Not a cat click stores the selector's value again with the class. Skip leaves the files in `uncertain/` and does not set a class. Capture negative writes the brick's latest preview JPEG into `negative/` with class `negative` and the lighting sent with the click. The page is sent that same lighting value back.
+
+`on_detect_all` runs only when at least one box is above the confidence threshold, so a dark empty scene produces no detection messages. The preview JPEG still updates on each camera-preview message, and the negative button reads that JPEG.
 
 Auto-saves and the negative button share one throttle of about one capture per second. If several cats are in the frame, the highest-confidence box is the one saved that second.
 

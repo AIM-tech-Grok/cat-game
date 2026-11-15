@@ -13,17 +13,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arduino.app_utils import App
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_bricks.video_objectdetection import VideoObjectDetection
-from arduino.app_peripherals.camera import Camera
 from arduino.app_utils.image import draw_bounding_boxes
 from fastapi.responses import Response
 
 from collector import PhotoStore
 
-# One default Camera(). The brick owns start/stop. The negative button reads the
-# same handle, so nothing opens /dev/videoN itself.
-camera = Camera()
+# The brick constructs the default Camera() itself. This app does not call
+# capture(): on app-cli 0.14.1 that method takes no arguments and holds the
+# camera lock for the whole FPS wait, so a second reader stalls the detector.
 ui = WebUI()
-detection = VideoObjectDetection(camera=camera, confidence=0.5, camera_preview=True)
+detection = VideoObjectDetection(confidence=0.5, camera_preview=True)
 
 
 class CatApp:
@@ -87,22 +86,23 @@ class CatApp:
         return out.getvalue()
 
     @staticmethod
-    def grab_frame() -> bytes | None:
-        """Current camera JPEG for a manual negative. Falls back to the last preview frame."""
-        array = None
-        try:
-            array = camera.capture(latest=True)
-        except Exception as exc:
-            print(f"camera capture failed: {exc}")
-        if array is not None:
-            from arduino.app_utils.image import compress_to_jpeg
+    def preview_jpeg() -> bytes | None:
+        """Latest preview JPEG, including frames where nothing was detected.
 
-            encoded = compress_to_jpeg(array)
-            if encoded is not None:
-                # The helper's docstring says bytes. The implementation returns a NumPy array.
-                data = encoded if isinstance(encoded, bytes) else encoded.tobytes()
-                if data:
-                    return data
+        on_detect_all runs only after at least one box passes the confidence filter,
+        so an empty scene never reaches remember_frame. camera-preview messages still
+        update the brick's last frame, and _decode_preview_frame() turns that into
+        JPEG bytes. That is the same JPEG the detection callback receives.
+        """
+        decode = getattr(detection, "_decode_preview_frame", None)
+        if callable(decode):
+            try:
+                frame = decode()
+            except Exception as exc:
+                print(f"preview decode failed: {exc}")
+                frame = None
+            if frame:
+                return frame
         return PhotoStore.last_frame()
 
     @staticmethod
@@ -140,18 +140,25 @@ class CatApp:
 
     @staticmethod
     def on_capture_negative(sid, data):
-        if isinstance(data, dict) and isinstance(data.get("lighting"), str):
-            PhotoStore.set_lighting(data["lighting"].strip().lower())
-        frame = CatApp.grab_frame()
+        chosen = PhotoStore.lighting_from(data)
+        if chosen is None:
+            chosen = PhotoStore.lighting()
+        else:
+            PhotoStore.set_lighting(chosen)
+        # Echo the tag from this click. A connect/hello snapshot must not leave the
+        # selector on the default after the client sent another value.
+        ui.send_message("lighting", chosen, room=sid)
+        frame = CatApp.preview_jpeg()
         if not frame:
-            ui.send_message("status", "No frame yet.", room=sid)
+            ui.send_message("status", "No preview frame yet.", room=sid)
             return
-        record = PhotoStore.save_negative(frame)
+        record = PhotoStore.save_negative(frame, lighting=chosen)
         if record is None:
             ui.send_message("status", "Wait a second before the next capture.", room=sid)
             return
-        print(f"saved {record['id']} class=negative {record['files'].get('full')}")
+        print(f"saved {record['id']} class=negative {record['lighting']} {record['files'].get('full')}")
         ui.send_message("status", f"Negative stored ({record['lighting']}).", room=sid)
+        ui.send_message("lighting", record["lighting"], room=sid)
         CatApp.publish(record)
 
     @staticmethod
