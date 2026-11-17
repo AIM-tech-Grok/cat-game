@@ -97,7 +97,23 @@ body {
 }
 
 #capture-image[hidden],
-#debug-image[hidden] {
+#debug-image[hidden],
+#auto-image[hidden] {
+  display: none;
+}
+
+#auto-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+  object-fit: contain;
+  margin-top: 12px;
+  border-radius: 8px;
+  background: #1c2428;
+}
+
+#auto-image[hidden] {
   display: none;
 }
 

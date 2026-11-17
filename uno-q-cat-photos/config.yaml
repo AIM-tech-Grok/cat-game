@@ -1,0 +1,10 @@
+# Daytime auto-capture. The Web UI toggle overrides auto_enabled while the app is running.
+# Environment variables CAT_AUTO, CAT_CONFIDENCE, CAT_COOLDOWN_S, CAT_MAX_PHOTOS,
+# CAT_MAX_DISK_MB, and CAT_CAMERA_GAP_S override this file.
+
+auto_enabled: false
+confidence: 0.5
+cooldown_s: 0.5
+max_photos: 300
+max_disk_mb: 200
+camera_gap_s: 30

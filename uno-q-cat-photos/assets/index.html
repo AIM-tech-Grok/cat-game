@@ -59,6 +59,15 @@ Live view adapted from inspirational/common/video-generic-object-detection.
             <p id="status" class="hint"></p>
           </section>
 
+          <section class="container" id="auto-panel">
+            <h2>Auto-capture</h2>
+            <p id="auto-state" class="hint">Off. Saves a cat only, about every 0.5 s.</p>
+            <button type="button" id="auto-toggle">Turn on</button>
+            <p id="auto-last" class="hint">No auto capture yet.</p>
+            <img id="auto-image" alt="Last auto capture" hidden />
+            <p id="camera-state" class="hint">Camera watch starts with the app.</p>
+          </section>
+
           <section class="container">
             <h2>Counts</h2>
             <p class="hint">Unlabelled crops stay out of the training set.</p>

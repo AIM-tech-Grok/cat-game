@@ -47,11 +47,34 @@ Set lighting (day, lamp, low, other) before a capture. That value is stored with
 
 `on_detect_all` runs only when at least one box is above the confidence threshold, so a dark empty scene produces no detection messages. The preview JPEG still updates on each camera-preview message, and the negative button reads that JPEG.
 
-Auto-saves and the negative button share one throttle of about one capture per second. If several cats are in the frame, the highest-confidence box is the one saved that second.
+With auto-capture off, a cat in view is saved about once a second so you can label it, and that save shares its throttle with the negative button. With auto-capture on, only a `cat` box at or above the confidence threshold is saved, about every 0.5 s, which is close to the detector's ~0.6 s per result. Other classes, including a steady `oven` false positive, are ignored.
 
 Counts on the page are class by lighting. The `uncertain` row is the unlabelled queue. It is not training data.
 
-`http://<board-host>:7000/summary` returns those counts as JSON.
+`http://<board-host>:7000/summary` returns the counts, the auto-capture settings and last auto shot, and the camera watch.
+
+## Auto-capture
+
+Turn it on from the page when the camera can be left running in daylight. There is no infrared or night path. The switch is sent as `set_auto`. While it is on, the detection callback only queues a save: the queue holds two frames and drops the rest if disk work falls behind, so the callback does not wait on the filesystem.
+
+Each saved shot is the brick's latest preview JPEG (the same frame the callback already received; `Camera.capture()` is not called), plus a crop of the highest-confidence cat box. It lands in `uncertain/` with `class` null, `label` `cat`, and `source` `auto`, so it can be sorted later and is not training data until you label it. Labelling clears it from the prune list. Photos you labelled, and shots taken with auto-capture off, are never deleted to free space.
+
+The storage guard keeps a running photo count and byte total. It does not rescan the directory or rewrite the manifest on each save. When a save would pass the cap, the oldest `source: auto` shots that are still unlabelled are removed in one batch (files deleted, and a `deleted` line appended per id). Defaults are 300 photos and 200 MB, which is a few minutes of a cat sitting in frame at two saves a second.
+
+Settings live in `config.yaml` next to `app.yaml` (unknown keys in `app.yaml` are rejected by the CLI). Environment variables override the file:
+
+| Setting | Default | Environment |
+| --- | --- | --- |
+| auto-capture | off | `CAT_AUTO` (`1` or `true`) |
+| confidence | 0.5 | `CAT_CONFIDENCE` |
+| cooldown | 0.5 s | `CAT_COOLDOWN_S` |
+| max photos | 300 | `CAT_MAX_PHOTOS` |
+| disk budget | 200 MB | `CAT_MAX_DISK_MB` |
+| camera gap | 30 s | `CAT_CAMERA_GAP_S` |
+
+`0` for the photo cap or the disk budget means that limit is not applied.
+
+If the preview JPEG or a detection result is missing for the camera gap, the app prints one line to the log, for example `2026-11-15T19:12:00+01:00 camera: no preview frame since 2026-11-15T19:11:30+01:00`, and again when it recovers. The same events are the last camera line on the page and in `/summary` under `camera.events`. A USB dropout shows up as both "no preview frame" and "no detection result". An empty but connected scene shows only the detection gap, because the preview keeps updating.
 
 ## Export
 
@@ -72,6 +95,7 @@ On the board the app directory is bind-mounted at `/app`, so photos written to `
 ```
 uno-q-cat-photos/
   app.yaml
+  config.yaml             # auto-capture limits; env vars override
   README.md
   python/main.py          # bricks, callbacks, HTTP routes
   python/collector.py     # crop, files, manifest
@@ -115,4 +139,4 @@ python -m py_compile uno-q-cat-photos/python/main.py uno-q-cat-photos/python/col
 python -m unittest discover -s uno-q-cat-photos/tests -v
 ```
 
-The test checks clamp and crop in preview pixels, the one-per-second throttle, that a label without a class is refused, and that the default zip leaves unlabelled crops out.
+The tests check clamp and crop in preview pixels, the one-per-second manual throttle, that a label without a class is refused, that the default zip leaves unlabelled crops out, cat-only filtering, the 0.5 s cooldown, a burst of a few hundred auto saves (oldest unlabelled auto shots are pruned, labelled and manual shots stay, manifest tombstones match the files), and the camera-gap log.

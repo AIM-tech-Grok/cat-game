@@ -29,6 +29,18 @@ ui.on_message("lighting", showLighting);
 ui.on_message("detection", showDetections);
 ui.on_message("status", showStatus);
 
+const autoToggle = document.getElementById("auto-toggle");
+const autoState = document.getElementById("auto-state");
+const autoLast = document.getElementById("auto-last");
+const autoImage = document.getElementById("auto-image");
+const cameraState = document.getElementById("camera-state");
+let autoEnabled = false;
+let autoId = null;
+
+autoToggle.addEventListener("click", () => {
+  ui.send_message("set_auto", { enabled: !autoEnabled });
+});
+
 document.querySelectorAll('input[name="lighting"]').forEach((input) => {
   input.addEventListener("change", () => {
     if (input.checked) {
@@ -133,6 +145,7 @@ function setLabelButtons(enabled) {
 }
 
 function showSummary(summary) {
+  showAuto(summary || {});
   const counts = summary && summary.counts ? summary.counts : emptyCounts();
   countsBody.replaceChildren();
   CLASSES.forEach((name) => {
@@ -148,6 +161,40 @@ function showSummary(summary) {
     });
     countsBody.appendChild(row);
   });
+}
+
+function showAuto(summary) {
+  const auto = summary.auto || {};
+  autoEnabled = Boolean(auto.enabled);
+  const photos = Number(auto.photos) || 0;
+  const maxPhotos = Number(auto.max_photos) || 0;
+  const diskMb = (Number(auto.disk_bytes) || 0) / (1024 * 1024);
+  const maxDisk = Number(auto.max_disk_mb) || 0;
+  autoState.textContent = autoEnabled
+    ? `On. Cat only, confidence ≥ ${auto.threshold}, every ${auto.cooldown_s} s. ${photos}/${maxPhotos} photos, ${diskMb.toFixed(1)}/${maxDisk} MB.`
+    : `Off. Turn on to save a cat about every ${auto.cooldown_s || 0.5} s.`;
+  autoToggle.textContent = autoEnabled ? "Turn off" : "Turn on";
+  const last = auto.last;
+  if (!last || !last.id) {
+    autoId = null;
+    autoLast.textContent = "No auto capture yet.";
+    autoImage.hidden = true;
+    autoImage.removeAttribute("src");
+  } else {
+    autoId = last.id;
+    const confidence = Number(last.confidence);
+    const percent = Number.isFinite(confidence) ? `${(confidence * 100).toFixed(0)}%` : "";
+    autoLast.textContent = `${last.timestamp} · ${percent}`;
+    autoImage.hidden = false;
+    const kind = last.has_crop ? "crop" : "full";
+    autoImage.src = `/photo/${encodeURIComponent(last.id)}/${kind}?t=${Date.now()}`;
+  }
+  const camera = summary.camera || {};
+  const events = Array.isArray(camera.events) ? camera.events : [];
+  const latest = events.length ? events[events.length - 1] : null;
+  cameraState.textContent = latest
+    ? `${latest.time} ${latest.message}`
+    : `Preview ${camera.preview || "ok"}, detections ${camera.detection || "ok"}.`;
 }
 
 function emptyCounts() {
