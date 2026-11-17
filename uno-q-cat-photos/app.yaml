@@ -1,0 +1,8 @@
+name: Collect cat photos
+icon: 🐱
+description: Save labelled photos of the grey cat and the black cat from the USB camera.
+
+bricks:
+  - arduino:video_object_detection:
+      model: yolox-object-detection
+  - arduino:web_ui

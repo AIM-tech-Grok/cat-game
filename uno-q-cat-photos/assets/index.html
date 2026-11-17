@@ -1,0 +1,121 @@
+<!--
+SPDX-FileCopyrightText: Copyright (C) Arduino s.r.l. and/or its affiliated companies
+
+SPDX-License-Identifier: MPL-2.0
+
+Live view adapted from inspirational/common/video-generic-object-detection.
+-->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collect cat photos</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <h1>Collect cat photos</h1>
+        <p class="sub">YOLOX-nano, confidence 0.5. Auto-saves go to uncertain until you label them.</p>
+      </header>
+
+      <div class="main-content">
+        <section class="container" id="video-container">
+          <h2>Live view</h2>
+          <div id="videoFeedContainer">
+            <div id="videoPlaceholder" class="camera-status">
+              <p>Searching webcam...</p>
+            </div>
+            <iframe
+              id="dynamicIframe"
+              title="Video stream"
+              frameborder="0"
+              style="display: none"></iframe>
+          </div>
+          <p id="live-status" class="hint">Waiting for detections.</p>
+        </section>
+
+        <div class="right-column">
+          <section class="container">
+            <h2>Latest capture</h2>
+            <p id="capture-meta" class="hint">No capture yet.</p>
+            <img id="capture-image" alt="Latest crop" hidden />
+            <img id="debug-image" alt="Preview with boxes" hidden />
+            <div class="lighting" role="radiogroup" aria-label="Lighting">
+              <label><input type="radio" name="lighting" value="day" checked /> Day</label>
+              <label><input type="radio" name="lighting" value="lamp" /> Lamp</label>
+              <label><input type="radio" name="lighting" value="low" /> Low</label>
+              <label><input type="radio" name="lighting" value="other" /> Other</label>
+            </div>
+            <div class="buttons">
+              <button type="button" data-class="grey" disabled>Grey</button>
+              <button type="button" data-class="black" disabled>Black</button>
+              <button type="button" data-class="negative" disabled>Not a cat</button>
+              <button type="button" data-class="skip" disabled>Skip</button>
+            </div>
+            <button type="button" id="capture-negative">Capture negative</button>
+            <p id="status" class="hint"></p>
+          </section>
+
+          <section class="container" id="auto-panel">
+            <h2>Auto-capture</h2>
+            <p id="auto-state" class="hint">Off. Saves a cat only, about every 0.5 s.</p>
+            <button type="button" id="auto-toggle">Turn on</button>
+            <p id="auto-last" class="hint">No auto capture yet.</p>
+            <img id="auto-image" alt="Last auto capture" hidden />
+            <p id="camera-state" class="hint">Camera watch starts with the app.</p>
+          </section>
+
+          <section class="container">
+            <h2>Counts</h2>
+            <p class="hint">Unlabelled crops stay out of the training set.</p>
+            <table id="counts">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Day</th>
+                  <th>Lamp</th>
+                  <th>Low</th>
+                  <th>Other</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p class="downloads">
+              <a href="/export.zip">Download labelled set</a>
+              <a href="/export.zip?include_uncertain=1">Include uncertain</a>
+            </p>
+          </section>
+        </div>
+      </div>
+      <div id="error-container" class="error-message" style="display: none"></div>
+    </div>
+
+    <script>
+      const iframe = document.getElementById("dynamicIframe");
+      const placeholder = document.getElementById("videoPlaceholder");
+      const streamUrl = `http://${window.location.hostname}:4912/embed`;
+      let intervalId;
+
+      iframe.onload = () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+        placeholder.style.display = "none";
+        iframe.style.display = "block";
+      };
+
+      const startLoading = () => {
+        iframe.src = streamUrl;
+      };
+
+      intervalId = setInterval(startLoading, 1000);
+    </script>
+
+    <script src="libs/socket.io.min.js"></script>
+    <script src="libs/arduino.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
